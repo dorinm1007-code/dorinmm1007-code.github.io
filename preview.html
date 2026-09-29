@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ElectroEngineer — инженерный расчёт</title>
+<style>
+:root{--bg:#0b1020;--p:#121a2d;--p2:#18233b;--t:#eef3ff;--m:#9eabc5;--a:#4da3ff;--ok:#35c98a;--w:#ffc857;--d:#ff647c;--b:#293754}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(135deg,#09101e,#10182b);color:var(--t);font:14px Arial,sans-serif}header{padding:24px 5%;border-bottom:1px solid var(--b);position:sticky;top:0;background:#0c1426ee;z-index:5}h1{margin:0 0 5px}.sub,.small{color:var(--m)}main{max-width:1400px;margin:auto;padding:20px}.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}.tab,button{border:0;border-radius:9px;padding:10px 14px;cursor:pointer;font-weight:600}.tab{background:var(--p);color:var(--t);border:1px solid var(--b)}.tab.active,button{background:var(--a);color:#07111f}.section{display:none}.section.active{display:block}.card{background:var(--p);border:1px solid var(--b);border-radius:14px;padding:16px;margin-bottom:14px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}label{display:block;color:var(--m);font-size:12px;margin-bottom:5px}input,select{width:100%;padding:10px;border:1px solid var(--b);border-radius:9px;background:#0c1425;color:var(--t)}button.secondary{background:#263550;color:var(--t)}button.danger{background:var(--d);color:white}.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px}.kpi{background:var(--p2);border:1px solid var(--b);border-radius:12px;padding:13px}.kpi b{display:block;font-size:20px;margin:5px 0}table{width:100%;border-collapse:collapse}th,td{padding:8px;border-bottom:1px solid var(--b);text-align:left}.scroll{overflow:auto}.diagram{overflow:auto;background:#0b1222;padding:12px;border-radius:12px}.svgbox{min-width:800px;width:100%;height:240px}.note{border-left:3px solid var(--w);padding:10px;background:#211d11}.oktxt{color:var(--ok)}.warntxt{color:var(--w)}@media(max-width:700px){header{position:static}main{padding:12px}}@media print{body{background:white;color:#111}header,.tabs,.no-print,button{display:none!important}.section{display:block!important}.card{background:white;color:#111;border:1px solid #ccc}.small,label{color:#555}.diagram{background:white}}
+</style>
+</head>
+<body>
+<header>
+<div style="display:flex;justify-content:space-between;align-items:center;gap:20px;flex-wrap:wrap">
+  <div>
+    <h1>⚡ ElectroEngineer</h1>
+    <div class="sub">Предварительный расчёт системы электроснабжения: 10 кВ → ТП → 0,4 кВ → ЩО → группы потребителей</div>
+  </div>
+  <div style="text-align:right;border-left:2px solid var(--a);padding-left:18px">
+    <div style="font-size:16px;font-weight:700">Dorin Monolatii</div>
+    <div style="color:var(--a);font-size:13px;font-weight:600">F.E.I.E. U.T.M.</div>
+  </div>
+</div>
+</header>
+<main>
+<div class="tabs no-print">
+<button class="tab active" data-tab="project">Проект</button><button class="tab" data-tab="loads">Нагрузки</button><button class="tab" data-tab="protection">Защита</button><button class="tab" data-tab="ground">Заземление</button><button class="tab" data-tab="economy">Экономика</button><button class="tab" data-tab="report">Отчёт</button>
+</div>
+
+<section id="project" class="section active">
+<div class="card"><h2>Параметры проекта</h2><div class="grid">
+<div><label>Название</label><input id="projectName" value="Система электроснабжения предприятия"></div>
+<div><label>Сеть ВН, кВ</label><select id="mv"><option>6</option><option selected>10</option><option>20</option></select></div>
+<div><label>Сеть НН, В</label><select id="lv"><option selected>400</option><option>380</option></select></div>
+<div><label>Коэффициент спроса</label><input id="demand" type="number" value=".85" step=".01"></div>
+<div><label>Целевой cosφ</label><input id="targetPf" type="number" value=".95" step=".01"></div>
+<div><label>Длина главной линии, м</label><input id="mainLength" type="number" value="100"></div>
+<div><label>Часов работы/год</label><input id="hours" type="number" value="4000"></div>
+<div><label>Цена электроэнергии, лей/кВт·ч</label><input id="price" type="number" value="4" step=".01"></div>
+</div></div>
+<div class="card"><h2>Трансформаторы</h2><div id="transformers"></div><button onclick="addTransformer()">＋ Добавить ТП</button></div>
+<div class="card"><h2>Однолинейная схема</h2><div class="diagram" id="diagram"></div></div>
+</section>
+
+<section id="loads" class="section">
+<div class="card"><h2>Группы потребителей</h2><div class="scroll"><table><thead><tr><th>Группа</th><th>Кол.</th><th>кВт</th><th>cosφ</th><th>Кат.</th><th>м</th><th></th></tr></thead><tbody id="loadRows"></tbody></table></div><button onclick="addLoad()">＋ Добавить нагрузку</button></div>
+<div class="card"><h2>Результаты</h2><div id="loadResults"></div></div>
+</section>
+
+<section id="protection" class="section">
+<div class="card"><h2>АВР и резерв</h2><div id="avrResult"></div></div>
+<div class="card"><h2>Главный автомат и кабель</h2><div id="protectionResult"></div></div>
+<div class="card"><h2>Предварительная селективность</h2><div id="selectivity"></div><div class="note">Проверка предварительная: для рабочего проекта нужны реальные характеристики автоматов, уставки и TCC-кривые.</div></div>
+</section>
+
+<section id="ground" class="section">
+<div class="card"><h2>Заземление</h2><div class="grid">
+<div><label>Удельное сопротивление грунта, Ω·м</label><input id="rho" type="number" value="100"></div>
+<div><label>Количество электродов</label><input id="electrodes" type="number" value="6"></div>
+<div><label>Длина электрода, м</label><input id="electrodeLen" type="number" value="3"></div>
+<div><label>Диаметр, мм</label><input id="electrodeD" type="number" value="16"></div>
+</div><div id="groundResult"></div></div>
+<div class="card"><h2>Молниезащита и УЗИП</h2><div class="grid"><div><label>Категория</label><select id="lightning"><option>I</option><option selected>II</option><option>III</option><option>IV</option></select></div><div><label>Тип ввода</label><select id="inputType"><option>Воздушная линия</option><option selected>Кабельный ввод</option></select></div></div><div id="lightningResult"></div></div>
+</section>
+
+<section id="economy" class="section">
+<div class="card"><h2>Экономика</h2><div class="grid">
+<div><label>Трансформатор, лей/кВА</label><input id="trPrice" type="number" value="1200"></div>
+<div><label>Кабель, лей/м</label><input id="cablePrice" type="number" value="250"></div>
+<div><label>Генератор, лей/кВА</label><input id="genPrice" type="number" value="1800"></div>
+<div><label>Экономия, %</label><input id="saving" type="number" value="5"></div>
+</div><div id="economyResult"></div></div>
+</section>
+
+<section id="report" class="section">
+<div class="card"><h2>Расчётный отчёт</h2><div class="no-print"><button onclick="calculate()">↻ Обновить</button><button onclick="window.print()">🖨 Сохранить PDF</button><button class="secondary" onclick="saveProject()">💾 Сохранить</button><button class="secondary" onclick="loadProject()">📂 Загрузить</button></div><div id="reportBody"></div></div>
+</section>
+<p class="small">Учебный/предварительный инструмент. Не заменяет рабочий проект и расчёты по действующим нормам РМ/IEC.</p>
+</main>
+
+<script>
+const std=[25,40,63,100,160,250,400,630,1000,1250,1600,2000,2500], brs=[16,25,32,40,50,63,80,100,125,160,200,250,315,400,500,630,800,1000,1250,1600], cables=[[2.5,25],[4,32],[6,40],[10,55],[16,75],[25,100],[35,125],[50,150],[70,190],[95,230],[120,260],[150,300],[185,340],[240,390]];
+let transformers=[{name:"ТП-1",kva:630,uk:6,reserve:15},{name:"ТП-2",kva:400,uk:6,reserve:15}];
+let loads=[{name:"Двигатели",count:4,kw:30,pf:.86,cat:"II",len:80},{name:"Освещение",count:1,kw:20,pf:.95,cat:"III",len:60},{name:"Розеточная сеть",count:1,kw:15,pf:.92,cat:"III",len:50}],R={};
+const $=id=>document.getElementById(id), n=id=>+$(id).value||0;
+function kpi(a,b,c){return `<div class="kpi"><span class="small">${a}</span><b>${b}</b><span class="small">${c}</span></div>`}
+function next(a){return brs.find(x=>x>=a)||brs.at(-1)} function cable(a){return cables.find(x=>x[1]>=a)||cables.at(-1)} function kva(a){return std.find(x=>x>=a)||std.at(-1)}
+function addTransformer(){transformers.push({name:"ТП-"+(transformers.length+1),kva:400,uk:6,reserve:15});render()}
+function delTransformer(i){transformers.splice(i,1);if(!transformers.length)transformers.push({name:"ТП-1",kva:400,uk:6,reserve:15});render()}
+function addLoad(){loads.push({name:"Новая группа",count:1,kw:10,pf:.9,cat:"III",len:30});render()}
+function delLoad(i){loads.splice(i,1);render()}
+function calc(){
+ const U=n("lv"),d=n("demand"),pf0=n("targetPf");let P=0,Q=0,c1=0;
+ loads.forEach(l=>{let p=l.count*l.kw*d;P+=p;Q+=p*Math.tan(Math.acos(Math.min(1,Math.max(.01,l.pf))));if(l.cat=="I")c1+=p});
+ let qc=Math.max(0,Q-P*Math.tan(Math.acos(Math.min(1,Math.max(.5,pf0))))),qn=Math.max(0,Q-qc),S=Math.hypot(P,qn),I=S*1000/(Math.sqrt(3)*U),sel=kva(S*1.15),main=next(I*1.1),cab=cable(I),uk=transformers[0]?.uk||6,ik=transformers[0]?transformers[0].kva*1000/(Math.sqrt(3)*U*(uk/100)):0;
+ let pf=S?P/S:1,Rline=.018*n("mainLength")/cab[0],X=.08*n("mainLength")/cab[0],du=Math.sqrt(3)*I*(Rline*pf+X*Math.sqrt(1-pf*pf)),ground=.5*n("rho")/(Math.max(1,n("electrodes"))*Math.max(.1,n("electrodeLen")));
+ let energy=P*n("hours"),cost=energy*n("price"),gen=c1?Math.max(50,Math.ceil(c1*1.2/50)*50):0,genCost=(c1&&transformers.length<2)?gen*n("genPrice"):0,inv=sel*n("trPrice")+n("mainLength")*n("cablePrice")+genCost,sav=cost*n("saving")/100;
+ return R={P,Q,qc,S,I,pf,sel,main,cab,ik,du,ground,energy,cost,gen,genCost,inv,sav,pay:sav?inv/sav:0,c1,has2:transformers.length>=2}
+}
+function renderT(){$("transformers").innerHTML=transformers.map((t,i)=>`<div class="grid card" style="margin:8px 0;background:var(--p2)"><div><label>Наименование</label><input value="${t.name}" oninput="transformers[${i}].name=this.value;calculate()"></div><div><label>кВА</label><input type="number" value="${t.kva}" oninput="transformers[${i}].kva=+this.value;calculate()"></div><div><label>Uk, %</label><input type="number" value="${t.uk}" oninput="transformers[${i}].uk=+this.value;calculate()"></div><div><label>Резерв, %</label><input type="number" value="${t.reserve}" oninput="transformers[${i}].reserve=+this.value;calculate()"></div><button class="danger" onclick="delTransformer(${i})">Удалить</button></div>`).join("")}
+function renderL(){$("loadRows").innerHTML=loads.map((l,i)=>`<tr><td><input value="${l.name}" oninput="loads[${i}].name=this.value;calculate()"></td><td><input type="number" value="${l.count}" oninput="loads[${i}].count=+this.value;calculate()"></td><td><input type="number" value="${l.kw}" oninput="loads[${i}].kw=+this.value;calculate()"></td><td><input type="number" step=".01" value="${l.pf}" oninput="loads[${i}].pf=+this.value;calculate()"></td><td><select onchange="loads[${i}].cat=this.value;calculate()">${["I","II","III","IV"].map(x=>`<option ${x==l.cat?"selected":""}>${x}</option>`).join("")}</select></td><td><input type="number" value="${l.len}" oninput="loads[${i}].len=+this.value;calculate()"></td><td><button class="danger" onclick="delLoad(${i})">×</button></td></tr>`).join("")}
+function diagram(){let tr=transformers.map(x=>x.name+" "+x.kva+" кВА").join(" + ");$("diagram").innerHTML=`<svg class="svgbox" viewBox="0 0 1100 240"><defs><marker id="ar" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8z" fill="#4da3ff"/></marker></defs><g fill="none" stroke="#4da3ff" stroke-width="3" marker-end="url(#ar)"><path d="M120 120H230M380 120H490M640 120H750M900 120H1010"/></g>${box(20,80,100,80,"Сеть",n("mv")+" кВ")}${box(230,80,150,80,"РУ-"+n("mv")+" кВ","ввод / защита")}${box(490,70,150,100,"ТП",tr)}${box(750,80,150,80,"ГРЩ 0,4 кВ","главный щит")}${box(1010,80,70,80,"ЩО","группы")}</svg>`}
+function box(x,y,w,h,a,b){return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="12" fill="#121a2d" stroke="#293754"/><text x="${x+w/2}" y="${y+31}" fill="#eef3ff" text-anchor="middle" font-weight="700">${a}</text><text x="${x+w/2}" y="${y+55}" fill="#9eabc5" text-anchor="middle" font-size="12">${b}</text>`}
+function render(){
+ R=calc();renderT();renderL();
+ $("loadResults").innerHTML=`<div class="kpis">${kpi("P",R.P.toFixed(1)+" кВт","расчётная")}${kpi("Q",R.Q.toFixed(1)+" квар","реактивная")}${kpi("Qc",R.qc.toFixed(1)+" квар","компенсация")}${kpi("S",R.S.toFixed(1)+" кВА","полная")}${kpi("I",R.I.toFixed(1)+" А","линейный ток")}${kpi("cosφ",R.pf.toFixed(3),"после компенсации")}</div><p>Требуемая мощность ТП с резервом 15%: <b>${R.sel} кВА</b>.</p>`;
+ $("avrResult").innerHTML=`<p><b>АВР:</b> ${R.c1?(R.has2?"рекомендуется резервирование от двух вводов/ТП.":"для категории I требуется резервный источник."):"по категории I не требуется."}</p><p><b>Генератор:</b> ${R.c1?(R.has2?"не обязателен автоматически при наличии независимого резервного ввода.":"ориентировочно "+R.gen+" кВА."):"не требуется по категории I."}</p>`;
+ $("protectionResult").innerHTML=`<div class="kpis">${kpi("Главный автомат",R.main+" A","ориентировочно")}${kpi("Кабель",R.cab[0]+" мм²","предварительно")}${kpi("Iкз",R.ik.toFixed(0)+" А","0,4 кВ, приближённо")}${kpi("ΔU",(R.du/n("lv")*100).toFixed(2)+" %","главная линия")}</div>`;
+ $("selectivity").innerHTML="<table><tr><th>Группа</th><th>Iрасч</th><th>Автомат</th><th>Проверка</th></tr>"+loads.map(l=>{let p=l.count*l.kw*n("demand"),i=p*1000/(Math.sqrt(3)*n("lv")),b=next(i*1.15);return `<tr><td>${l.name}</td><td>${i.toFixed(1)} А</td><td>${b} A</td><td class="${R.main>b?"oktxt":"warntxt"}">${R.main>b?"Номинальная ступень OK":"Нужна проверка"}</td></tr>`}).join("")+"</table>";
+ $("groundResult").innerHTML=`<p>Оценочное сопротивление: <b>${R.ground.toFixed(2)} Ω</b>. ${R.ground<=4?'<span class="oktxt">Ориентировочно ≤ 4 Ω.</span>':'<span class="warntxt">Ориентировочно > 4 Ω; требуется уточнение.</span>'}</p>`;
+ $("lightningResult").innerHTML=`<p>Категория <b>${$("lightning").value}</b>, ввод: <b>${$("inputType").value}</b>. Предусмотреть УЗИП, уравнивание потенциалов и полноценный расчёт молниезащиты.</p>`;
+ $("economyResult").innerHTML=`<div class="kpis">${kpi("Энергия",Math.round(R.energy)+" кВт·ч/год","")}${kpi("Затраты",Math.round(R.cost)+" лей/год","")}${kpi("Инвестиции",Math.round(R.inv)+" лей","ориентировочно")}${kpi("Экономия",Math.round(R.sav)+" лей/год","")}${kpi("Окупаемость",R.pay?R.pay.toFixed(1)+" лет":"—","простая")}</div>`;
+ diagram();report()
+}
+function report(){$("reportBody").innerHTML=`<h2>${$("projectName").value}</h2><p>Дата: ${new Date().toLocaleString("ru-RU")}</p><h3>Исходные данные</h3><p>${n("mv")} кВ / ${n("lv")} В; kсп=${n("demand")}; cosφц=${n("targetPf")}; линия ${n("mainLength")} м.</p><h3>Нагрузки</h3><table><tr><th>Группа</th><th>Кол.</th><th>кВт</th><th>cosφ</th><th>Кат.</th></tr>${loads.map(l=>`<tr><td>${l.name}</td><td>${l.count}</td><td>${l.kw}</td><td>${l.pf}</td><td>${l.cat}</td></tr>`).join("")}</table><h3>Расчёт</h3><p>P=${R.P.toFixed(2)} кВт; Q=${R.Q.toFixed(2)} квар; Qc=${R.qc.toFixed(2)} квар; S=${R.S.toFixed(2)} кВА; I=${R.I.toFixed(2)} А; cosφ=${R.pf.toFixed(3)}.</p><h3>Защита</h3><p>Главный автомат ${R.main} A; кабель ${R.cab[0]} мм²; Iкз≈${R.ik.toFixed(0)} А; АВР/генератор: см. вкладку «Защита».</p><h3>Заземление</h3><p>Оценочно ${R.ground.toFixed(2)} Ω.</p><h3>Экономика</h3><p>${Math.round(R.energy)} кВт·ч/год; ${Math.round(R.cost)} лей/год; инвестиции ≈ ${Math.round(R.inv)} лей.</p><h3>Однолинейная схема</h3>${$("diagram").innerHTML}<div class="note"><b>Важно:</b> это предварительный учебный расчёт. Для рабочего проекта нужны фактические данные объекта, конкретные аппараты, проверка кабелей по нагреву/КЗ/ΔU, координация защит, расчёт заземления и молниезащиты по действующим нормам РМ/IEC.</div>`}
+function calculate(){render()}function saveProject(){localStorage.setItem("EE",JSON.stringify({transformers,loads}));alert("Сохранено в браузере")}function loadProject(){let x=localStorage.getItem("EE");if(x){let p=JSON.parse(x);transformers=p.transformers;loads=p.loads;render();alert("Загружено")}else alert("Сохранённых данных нет")}
+document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));document.querySelectorAll(".section").forEach(x=>x.classList.remove("active"));b.classList.add("active");$(b.dataset.tab).classList.add("active")});
+document.addEventListener("input",e=>{if(e.target.matches("input,select"))calculate()});render();
+</script>
+
+<style>
+.probox{margin:18px 0;padding:18px;border:1px solid #2b3b57;border-radius:14px;background:#101a2b}
+.progrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px}
+.prokpi{padding:12px;border:1px solid #2b3b57;border-radius:10px;background:#16243a}
+.prokpi b{display:block;font-size:21px;margin:5px 0}
+.protable{width:100%;border-collapse:collapse}.protable th,.protable td{padding:8px;border-bottom:1px solid #2b3b57;text-align:left}
+.prowarn{border-left:3px solid #ffc857;padding:10px;background:#2a2414;margin-top:10px}
+.prodanger{border-left:3px solid #ff647c;padding:10px;background:#301620;margin-top:10px}
+</style>
+<div id="pro-module" class="probox">
+<h2>⚙ ElectroEngineer Pro — расширенный расчёт</h2>
+<p class="small">Дополнительная проверка трансформаторов, КЗ, падения напряжения, резервирования, селективности и экономики.</p>
+<div class="progrid">
+<div class="prokpi"><span class="small">Pрасч</span><b id="proP">—</b><span class="small">кВт</span></div>
+<div class="prokpi"><span class="small">Sрасч</span><b id="proS">—</b><span class="small">кВА</span></div>
+<div class="prokpi"><span class="small">Iрасч</span><b id="proI">—</b><span class="small">А</span></div>
+<div class="prokpi"><span class="small">Qc</span><b id="proQc">—</b><span class="small">квар</span></div>
+<div class="prokpi"><span class="small">ΔU</span><b id="proDU">—</b><span class="small">%</span></div>
+<div class="prokpi"><span class="small">Iкз</span><b id="proIKZ">—</b><span class="small">А</span></div>
+</div>
+
+<h3>Проверка трансформаторов</h3>
+<div id="proTR"></div>
+
+<h3>КЗ в характерных точках</h3>
+<table class="protable"><thead><tr><th>Точка</th><th>Iкз, А</th><th>Примечание</th></tr></thead>
+<tbody id="proKZ"></tbody></table>
+
+<h3>Предварительная селективность</h3>
+<table class="protable"><thead><tr><th>Уровень</th><th>Номинал</th><th>Статус</th></tr></thead>
+<tbody id="proSEL"></tbody></table>
+
+<h3>Резервирование</h3>
+<div id="proRES"></div>
+
+<h3>Экономика</h3>
+<div id="proECO"></div>
+
+<div class="prowarn"><b>Учебный режим:</b> эти расчёты предварительные. Реальный проект требует актуальных норм РМ/IEC, паспортных данных оборудования, полного расчёта КЗ, TCC-селективности, заземления, молниезащиты и проверки кабелей.</div>
+</div>
+
+<script>
+(function(){
+function N(id,d){var e=document.getElementById(id);if(!e)return d;var x=parseFloat(e.value);return isFinite(x)?x:d}
+function loads(){
+ return Array.from(document.querySelectorAll('#loadRows tr')).map(function(r){
+  var i=r.querySelectorAll('input'),s=r.querySelector('select');
+  return {
+   name:i[0]?i[0].value:'Группа',
+   count:i[1]?+i[1].value||1:1,
+   kw:i[2]?+i[2].value||0:0,
+   pf:i[3]?+i[3].value||.9:.9,
+   cat:s?s.value:'III'
+  };
+ });
+}
+function calc(){
+ var U=N('lv',400),kd=N('demand',.85),pfT=N('targetPf',.95),P=0,Q=0,C1=0,C2=0;
+ loads().forEach(function(l){
+  var p=l.count*l.kw*kd, pf=Math.max(.1,Math.min(1,l.pf));
+  P+=p;Q+=p*Math.tan(Math.acos(pf));
+  if(l.cat==='I')C1+=p;if(l.cat==='II')C2+=p;
+ });
+ var qt=P*Math.tan(Math.acos(Math.max(.5,Math.min(.999,pfT))));
+ var qc=Math.max(0,Q-qt),qa=Math.max(0,Q-qc),S=Math.hypot(P,qa),I=S*1000/(Math.sqrt(3)*U);
+ var pf=S?P/S:1,L=N('mainLength',100);
+ var cs=I<=25?2.5:I<=40?6:I<=63?10:I<=100?25:I<=160?50:I<=250?120:240;
+ var R=.018*L/cs,X=.08*L/cs,sin=Math.sqrt(Math.max(0,1-pf*pf));
+ var du=Math.sqrt(3)*I*(R*pf+X*sin),dup=du/U*100;
+ var tr=0;document.querySelectorAll('#transformers .card').forEach(function(c){
+  var a=c.querySelectorAll('input');if(a[1])tr+=+a[1].value||0;
+ });
+ var ztr=(U*U)/(Math.max(1,tr)*1000)*.06;
+ var ikz0=U/(Math.sqrt(3)*Math.max(.0001,ztr));
+ var zline=Math.hypot(R,X),ikz1=U/(Math.sqrt(3)*Math.max(.0001,ztr+zline));
+ var gen=C1>0?Math.ceil(C1*1.25/50)*50:0;
+ var energy=P*N('hours',4000),cost=energy*N('price',4);
+ var capex=tr*N('trPrice',1200)+L*N('cablePrice',250)+N('panelPrice',25000)+N('installPrice',30000)+(gen*N('genPrice',1800));
+ var saving=cost*N('saving',5)/100;
+ return {P:P,Q:Q,qc:qc,S:S,I:I,du:du,dup:dup,ikz0:ikz0,ikz1:ikz1,tr:tr,need:S*1.15,C1:C1,C2:C2,gen:gen,energy:energy,cost:cost,capex:capex,pay:saving?capex/saving:0,main:I<=63?63:I<=100?100:I<=160?160:I<=250?250:400,cs:cs};
+}
+function put(id,x){var e=document.getElementById(id);if(e)e.textContent=x}
+function run(){
+ var d=calc();
+ put('proP',d.P.toFixed(1));put('proS',d.S.toFixed(1));put('proI',d.I.toFixed(1));
+ put('proQc',d.qc.toFixed(1));put('proDU',d.dup.toFixed(2));put('proIKZ',d.ikz1.toFixed(0));
+ document.getElementById('proTR').innerHTML='<b>Требуется:</b> '+d.need.toFixed(1)+' кВА с 15% запасом. '+
+ '<b>Установлено:</b> '+d.tr+' кВА — '+(d.tr>=d.need?'<span style="color:#35d08a">достаточно</span>':'<span style="color:#ff647c">недостаточно</span>')+
+ '<br>Главный кабель предварительно: <b>'+d.cs+' мм²</b>.';
+ document.getElementById('proKZ').innerHTML=
+ '<tr><td>У ТП</td><td>'+d.ikz0.toFixed(0)+'</td><td>упрощённая максимальная оценка</td></tr>'+
+ '<tr><td>Конец главной линии</td><td>'+d.ikz1.toFixed(0)+'</td><td>с учётом импеданса линии</td></tr>';
+ document.getElementById('proSEL').innerHTML=
+ '<tr><td>Отходящие линии</td><td>по группам</td><td>проверить TCC</td></tr>'+
+ '<tr><td>Главный ввод QF1</td><td>'+d.main+' A</td><td>нужна проверка Icu/Ics и TCC</td></tr>';
+ document.getElementById('proRES').innerHTML=
+ '<b>I категория:</b> '+d.C1.toFixed(1)+' кВт; <b>II категория:</b> '+d.C2.toFixed(1)+' кВт.<br>'+
+ (d.gen?'Ориентировочный генератор: <b>'+d.gen+' кВА</b>. Пусковые токи двигателей проверить отдельно.':'По введённым данным генератор для I категории не рассчитывается.')+
+ '<br>При двух ТП можно рассматривать резервирование через секционный аппарат при соответствии схемы требованиям проекта.';
+ document.getElementById('proECO').innerHTML=
+ '<table class="protable"><tr><th>Показатель</th><th>Значение</th></tr>'+
+ '<tr><td>Годовое потребление</td><td>'+Math.round(d.energy).toLocaleString('ru-RU')+' кВт·ч</td></tr>'+
+ '<tr><td>Стоимость энергии</td><td>'+Math.round(d.cost).toLocaleString('ru-RU')+' лей/год</td></tr>'+
+ '<tr><td>Ориентировочный CAPEX</td><td>'+Math.round(d.capex).toLocaleString('ru-RU')+' лей</td></tr>'+
+ '<tr><td>Простая окупаемость</td><td>'+d.pay.toFixed(1)+' лет</td></tr></table>';
+}
+window.proCalculate=run;
+setTimeout(run,200);
+})();
+</script>
+
+
+<style>
+.ee2{font-family:Arial,sans-serif;margin:28px 0}.ee2 *{box-sizing:border-box}
+.ee2 .hero,.ee2 .card{border:1px solid #d9e0e8;border-radius:14px;background:#fff;padding:16px}
+.ee2 .hero{background:#f5f9ff}.ee2 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+.ee2 h2,.ee2 h3{margin-top:0}.ee2 label{display:block;font-size:13px;font-weight:bold;margin:8px 0 4px}
+.ee2 input,.ee2 select{width:100%;padding:8px;border:1px solid #c8d0da;border-radius:7px}
+.ee2 button{border:0;border-radius:8px;padding:9px 13px;margin:5px 4px 5px 0;background:#1769d1;color:white;font-weight:bold;cursor:pointer}
+.ee2 button.secondary{background:#edf1f5;color:#222}.ee2 button.danger{background:#b42318}
+.ee2 table{width:100%;border-collapse:collapse;font-size:13px}.ee2 th,.ee2 td{padding:7px;border-bottom:1px solid #e5e9ee;text-align:left}
+.ee2 .kpi{font-size:22px;font-weight:bold}.ee2 .muted{color:#667085}.ee2 .ok{color:#137333;font-weight:bold}.ee2 .warn{color:#9a6700;font-weight:bold}.ee2 .bad{color:#b42318;font-weight:bold}
+.ee2 .tabs{display:flex;flex-wrap:wrap;gap:5px;margin:16px 0}.ee2 .tab{background:#edf1f5;color:#222}.ee2 .tab.active{background:#1769d1;color:#fff}
+.ee2 .note{padding:10px;background:#fff7df;border-left:4px solid #d99b00;border-radius:5px;margin-top:10px}
+.ee2 .scheme{overflow:auto;background:#f7f9fb;padding:22px;border-radius:12px}.ee2 .scheme-row{display:flex;align-items:center;justify-content:center;min-width:850px}
+.ee2 .node{border:2px solid #344054;border-radius:9px;background:white;padding:12px;text-align:center;min-width:120px}.ee2 .line{width:45px;height:3px;background:#344054}.ee2 .bus{width:4px;height:55px;background:#344054}
+</style>
+<section class="ee2" id="engineering-module">
+<div class="hero">
+<h2>ElectroEngineer Engineering — расширенный проектировщик</h2>
+<div class="muted">Dorin Monolatii · F.E.I.E. U.T.M.</div>
+<p>Предварительный учебный расчёт электроснабжения предприятия: нагрузки, двигатели, трансформаторы, кабели, аппараты защиты, КЗ, селективность, АВР, заземление, молниезащита и экономика.</p>
+<div class="note"><b>Важно:</b> результаты предварительные. Для рабочего проекта нужны действующие нормы РМ/IEC, реальные каталожные данные, условия прокладки, TCC, Icu/Ics и проверка специалистом.</div>
+</div>
+
+<div class="tabs">
+<button class="tab active" onclick="eeTab('loads',this)">1. Нагрузки</button>
+<button class="tab" onclick="eeTab('network',this)">2. Сеть</button>
+<button class="tab" onclick="eeTab('results',this)">3. Расчёт</button>
+<button class="tab" onclick="eeTab('scheme',this)">4. Схема</button>
+<button class="tab" onclick="eeTab('economy',this)">5. Экономика</button>
+</div>
+
+<div id="ee-loads">
+<div class="grid">
+<div class="card"><h3>Добавить нагрузку</h3>
+<label>Название</label><input id="eeName" value="Двигатель конвейера">
+<label>Тип</label><select id="eeType"><option>Двигатель</option><option>Освещение</option><option>Нагреватель</option><option>Розетки</option><option>Вентиляция</option><option>Другое</option></select>
+<label>Количество</label><input id="eeQty" type="number" value="1" min="1">
+<label>Мощность одного, kW</label><input id="eeKw" type="number" value="15" step=".1">
+<label>cosφ</label><input id="eeCos" type="number" value=".85" min=".1" max="1" step=".01">
+<label>КПД η</label><input id="eeEta" type="number" value=".92" min=".5" max="1" step=".01">
+<label>Категория</label><select id="eeCat"><option>I</option><option>II</option><option selected>III</option><option>IV</option></select>
+<label>Длина линии, m</label><input id="eeLen" type="number" value="40">
+<button onclick="eeAddLoad()">+ Добавить</button><button class="secondary" onclick="eeDemo()">Загрузить пример</button>
+</div>
+<div class="card"><h3>Нагрузки проекта</h3><div id="eeLoadTable"></div><button class="danger" onclick="eeClearLoads()">Очистить</button></div>
+</div></div>
+
+<div id="ee-network" style="display:none"><div class="grid">
+<div class="card"><h3>Сеть</h3>
+<label>U НН, V</label><input id="eeU" type="number" value="400">
+<label>Целевой cosφ</label><input id="eeTargetCos" type="number" value=".95" step=".01">
+<label>Uk трансформатора, %</label><input id="eeUk" type="number" value="6" step=".1">
+<label>Мощность КЗ сети ВН, MVA</label><input id="eeSk" type="number" value="250">
+<label>Запас трансформатора, %</label><input id="eeReserve" type="number" value="15">
+<label>Длина главного кабеля, m</label><input id="eeMainLen" type="number" value="60">
+<label>Часы работы/год</label><input id="eeHours" type="number" value="4000">
+<label>Цена, MDL/kWh</label><input id="eePrice" type="number" value="4" step=".01">
+</div>
+<div class="card"><h3>Трансформатор и резерв</h3>
+<label>Трансформатор, kVA</label><select id="eeTrafo"><option>250</option><option>400</option><option selected>630</option><option>1000</option><option>1250</option><option>1600</option><option>2000</option></select>
+<label>Количество</label><input id="eeTrafoQty" type="number" value="1" min="1">
+<label>Коэффициент генератора</label><input id="eeGenFactor" type="number" value="1.25" step=".05">
+<label>АВР</label><select id="eeATS"><option>Автоматический</option><option>Не требуется</option></select>
+</div></div></div>
+
+<div id="ee-results" style="display:none">
+<div class="grid" id="eeKpis"></div>
+<div class="card"><h3>Основные результаты</h3><div id="eeResults"></div></div>
+<div class="grid"><div class="card"><h3>Кабель</h3><div id="eeCable"></div></div><div class="card"><h3>Автомат</h3><div id="eeBreaker"></div></div></div>
+<div class="card"><h3>Селективность</h3><div id="eeSelectivity"></div></div>
+<div class="card"><h3>Заземление, молниезащита и АВР</h3><div id="eeProtection"></div></div>
+<button onclick="eeCalculate()">↻ Пересчитать</button><button class="secondary" onclick="window.print()">🖨 Печать / PDF</button>
+</div>
+
+<div id="ee-scheme" style="display:none"><div class="card"><h3>Однолинейная схема</h3>
+<div class="scheme"><div class="scheme-row">
+<div class="node">Сеть<br><b>10 kV</b></div><div class="line"></div><div class="node">КРУ/РУ-10 kV<br>QF ВН</div><div class="line"></div><div class="node">ТП<br><b id="eeSchemeTrafo">630 kVA</b></div><div class="line"></div><div class="node">ГРЩ<br><b>0.4 kV</b></div><div class="line"></div><div class="node">QF-1<br>Вводной</div><div class="line"></div><div class="node">Шины<br>0.4 kV</div>
+</div><div class="scheme-row"><div></div><div></div><div></div><div></div><div></div><div class="bus"></div></div>
+<div class="scheme-row"><div class="node">QF-2<br>Кат. I</div><div class="line"></div><div class="node">QF-3<br>Кат. II</div><div class="line"></div><div class="node">QF-4<br>Двигатели</div><div class="line"></div><div class="node">Нагрузки</div></div>
+</div></div></div>
+
+<div id="ee-economy" style="display:none"><div class="grid"><div class="card"><h3>Энергия</h3><div id="eeEnergy"></div></div><div class="card"><h3>Экономика</h3><div id="eeCapex"></div></div></div></div>
+</section>
+
+<script>
+(function(){
+let loads=[];
+const sizes=[10,16,25,35,50,70,95,120,150,185,240], amp={10:45,16:60,25:80,35:100,50:125,70:160,95:195,120:225,150:255,185:290,240:340};
+const brs=[16,20,25,32,40,50,63,80,100,125,160,200,250,315,400,500,630,800,1000,1250,1600];
+const v=id=>+document.getElementById(id).value;
+window.eeTab=function(t,b){['loads','network','results','scheme','economy'].forEach(x=>document.getElementById('ee-'+x).style.display=x===t?'block':'none');document.querySelectorAll('.ee2 .tab').forEach(x=>x.classList.remove('active'));if(b)b.classList.add('active');if(t!=='loads'&&t!=='network')eeCalculate();};
+window.eeAddLoad=function(){loads.push({name:eeName.value,type:eeType.value,qty:v('eeQty'),kw:v('eeKw'),cos:v('eeCos'),eta:v('eeEta'),cat:eeCat.value,len:v('eeLen')});eeRender();eeCalculate();};
+window.eeClearLoads=function(){loads=[];eeRender();eeCalculate();};
+window.eeDemo=function(){loads=[{name:'Двигатель конвейера',type:'Двигатель',qty:1,kw:15,cos:.85,eta:.92,cat:'I',len:40},{name:'Насос',type:'Двигатель',qty:2,kw:7.5,cos:.82,eta:.9,cat:'II',len:55},{name:'Вентиляция',type:'Вентиляция',qty:2,kw:5.5,cos:.85,eta:.9,cat:'II',len:35},{name:'Освещение',type:'Освещение',qty:1,kw:12,cos:.95,eta:1,cat:'III',len:70},{name:'Розетки',type:'Розетки',qty:1,kw:10,cos:.9,eta:1,cat:'III',len:50}];eeRender();eeCalculate();};
+function eeRender(){let h='<table><tr><th>Нагрузка</th><th>Тип</th><th>Кол.</th><th>kW</th><th>cosφ</th><th>Кат.</th><th></th></tr>';loads.forEach((x,i)=>h+=`<tr><td>${x.name}</td><td>${x.type}</td><td>${x.qty}</td><td>${x.kw}</td><td>${x.cos}</td><td>${x.cat}</td><td><button class="danger" onclick="loads.splice(${i},1);eeRender();eeCalculate()">×</button></td></tr>`);h+='</table>';document.getElementById('eeLoadTable').innerHTML=loads.length?h:'<span class="muted">Нагрузки пока не добавлены.</span>';};
+function calc(){let U=v('eeU'),target=v('eeTargetCos'),P=0,Q=0,p1=0,p2=0;loads.forEach(x=>{let p=x.kw*x.qty,q=p*Math.tan(Math.acos(Math.min(1,x.cos)));P+=p;Q+=q;if(x.cat==='I')p1+=p;if(x.cat==='II')p2+=p});let S=Math.hypot(P,Q),I=S*1000/(Math.sqrt(3)*U),Qt=P*Math.tan(Math.acos(target)),Qc=Math.max(0,Q-Qt),tr=v('eeTrafo')*v('eeTrafoQty'),req=S*(1+v('eeReserve')/100),br=brs.find(x=>x>=I*1.15)||1600,cs=sizes.find(x=>amp[x]>=I*1.15)||240;let L=v('eeMainLen'),R=.0225*L/cs,X=.08*L/cs,dU=Math.sqrt(3)*I*(R*(P/S||0)+X*(Q/S||0))/U*100;let Ztr=(v('eeUk')/100)*U*U/(tr*1000),Znet=U*U/(v('eeSk')*1e6)*1000,Zc=.02*L/cs,Ik0=U/(Math.sqrt(3)*(Ztr+Znet))*1000,IkEnd=U/(Math.sqrt(3)*(Ztr+Znet+Zc))*1000,gen=p1/target*v('eeGenFactor'),energy=P*v('eeHours'),cost=energy*v('eePrice');return{U,target,P,Q,S,I,Qc,tr,req,br,cs,dU,Ik0,IkEnd,p1,p2,gen,energy,cost};}
+window.eeCalculate=function(){let r=calc();document.getElementById('eeKpis').innerHTML=[['PΣ',r.P.toFixed(1)+' kW'],['QΣ',r.Q.toFixed(1)+' kvar'],['SΣ',r.S.toFixed(1)+' kVA'],['Iрасч',r.I.toFixed(1)+' A'],['КЗ у ТП',r.Ik0.toFixed(0)+' A'],['КЗ в конце',r.IkEnd.toFixed(0)+' A']].map(x=>`<div class="card"><div class="muted">${x[0]}</div><div class="kpi">${x[1]}</div></div>`).join('');document.getElementById('eeResults').innerHTML=`<table><tr><th>Параметр</th><th>Результат</th><th>Оценка</th></tr><tr><td>S</td><td>${r.S.toFixed(2)} kVA</td><td>—</td></tr><tr><td>Qc до cosφ ${r.target}</td><td>${r.Qc.toFixed(2)} kvar</td><td>${r.Qc>0?'Требуется УКРМ':'Не требуется'}</td></tr><tr><td>Трансформатор</td><td>${r.tr} kVA</td><td class="${r.tr>=r.req?'ok':'bad'}">${r.tr>=r.req?'Запас достаточен':'Недостаточная мощность'}</td></tr><tr><td>Iрасч</td><td>${r.I.toFixed(1)} A</td><td>запас выбора 15%</td></tr><tr><td>ΔU</td><td>${r.dU.toFixed(2)}%</td><td class="${r.dU<=5?'ok':r.dU<=7?'warn':'bad'}">${r.dU<=5?'В пределах предварительного допуска':r.dU<=7?'Требует внимания':'Высокое'}</td></tr></table>`;document.getElementById('eeCable').innerHTML=`<b>${r.cs} mm² Cu</b><br>Допустимый ток ≈ ${amp[r.cs]} A; требуемый предварительно ≥ ${(r.I*1.15).toFixed(1)} A.`;document.getElementById('eeBreaker').innerHTML=`<b>${r.br} A</b><br>Предварительно по току. Обязательно проверить Icu/Ics и TCC производителя.`;document.getElementById('eeSelectivity').innerHTML=`<table><tr><th>Уровень</th><th>Аппарат</th><th>In</th><th>Статус</th></tr><tr><td>Ввод ГРЩ</td><td>QF1</td><td>${r.br} A</td><td class="warn">Проверить TCC</td></tr><tr><td>Группа</td><td>QF2</td><td>${Math.max(16,Math.min(125,brs.find(x=>x>=r.I*.25)||125))} A</td><td class="warn">Проверить TCC</td></tr><tr><td>Двигатель</td><td>QF3</td><td>по паспорту</td><td class="warn">Нужны пусковые данные</td></tr></table>`;document.getElementById('eeProtection').innerHTML=`<p><b>Заземление:</b> принять TN-S/TN-C-S как исходный вариант и отдельно проверить PE/PEN, сопротивление и ток однофазного КЗ по действующим нормам.</p><p><b>Молниезащита:</b> определить класс защиты здания и согласовать внешнюю молниезащиту со SPD.</p><p><b>АВР:</b> ${r.p1>0?'для I категории нужна резервная схема; P I категории ≈ '+r.p1.toFixed(1)+' kW, ориентир генератора ≈ '+r.gen.toFixed(1)+' kVA.':'нагрузки I категории не заданы.'}</p>`;document.getElementById('eeEnergy').innerHTML=`<div class="kpi">${r.energy.toFixed(0)} kWh/год</div><p>Стоимость: <b>${r.cost.toFixed(0)} MDL/год</b>.</p>`;let cap=r.tr*850+r.cs*v('eeMainLen')*2.5+r.br*1.2+(r.Qc>0?r.Qc*35:0),save=r.cost*.03;document.getElementById('eeCapex').innerHTML=`<p>Учебный CAPEX: <b>${cap.toFixed(0)} MDL</b></p><p>Условная экономия 3%: <b>${save.toFixed(0)} MDL/год</b></p><p>Окупаемость: <b>${save?(cap/save).toFixed(1):'—'} лет</b></p>`;document.getElementById('eeSchemeTrafo').textContent=r.tr+' kVA';};
+eeDemo();eeRender();
+})();
+</script>
+
+</body>
+</html>
